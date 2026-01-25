@@ -1,5 +1,6 @@
 import Product from "../models/Product.js";
 
+//creating new product
 export const createProduct = async (req, res) => {
   try {
     const { name, price, stock } = req.body;
@@ -10,7 +11,7 @@ export const createProduct = async (req, res) => {
         message: "Name, price, and stock are required",
       });
     }
-
+    //values should be non-negative
     if (price < 0 || stock < 0) {
       return res.status(400).json({
         success: false,
@@ -20,6 +21,7 @@ export const createProduct = async (req, res) => {
 
     const product = await Product.create({ name, price, stock });
 
+    //created successfully
     return res.status(201).json({
       success: true,
       data: product,
@@ -34,7 +36,8 @@ export const createProduct = async (req, res) => {
 
 export const getProducts = async (_req, res) => {
   try {
-    const products = await Product.find({ isActive: true }).sort({
+    //sort products on descending order
+    const products = await Product.find().sort({
       createdAt: -1,
     });
 

@@ -3,6 +3,7 @@ import Product from "../models/Product.js";
 
 const TAX_RATE = 0.05;
 
+//add products to cart
 export const addToCart = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
@@ -14,8 +15,10 @@ export const addToCart = async (req, res) => {
       });
     }
 
+    //check for product
     const product = await Product.findById(productId);
-    if (!product || !product.isActive) {
+
+    if (!product) {
       return res.status(404).json({
         success: false,
         message: "Product not found",
@@ -23,10 +26,13 @@ export const addToCart = async (req, res) => {
     }
 
     let cart = await Cart.findOne();
+
+    //create cart if not
     if (!cart) {
       cart = await Cart.create({ items: [] });
     }
 
+    //check item existence in cart
     const existingItem = cart.items.find(
       (item) => item.product.toString() === productId,
     );
@@ -71,7 +77,9 @@ export const updateCartItem = async (req, res) => {
       });
     }
 
+    //check for cart existence
     const cart = await Cart.findOne();
+
     if (!cart) {
       return res.status(404).json({
         success: false,
@@ -79,6 +87,7 @@ export const updateCartItem = async (req, res) => {
       });
     }
 
+    //check for item index
     const itemIndex = cart.items.findIndex(
       (item) => item.product.toString() === productId,
     );
@@ -90,6 +99,7 @@ export const updateCartItem = async (req, res) => {
       });
     }
 
+    //update the quantity
     if (quantity === 0) {
       cart.items.splice(itemIndex, 1);
     } else {
@@ -130,6 +140,8 @@ export const removeFromCart = async (req, res) => {
     }
 
     const cart = await Cart.findOne();
+
+    //check for cart existence
     if (!cart) {
       return res.status(404).json({
         success: false,
@@ -137,18 +149,20 @@ export const removeFromCart = async (req, res) => {
       });
     }
 
-    const initialLength = cart.items.length;
-
-    cart.items = cart.items.filter(
-      (item) => item.product.toString() !== productId,
+    //check for item index
+    const itemIndex = cart.items.findIndex(
+      (item) => item.product.toString() === productId,
     );
 
-    if (cart.items.length === initialLength) {
+    if (itemIndex === -1) {
       return res.status(404).json({
         success: false,
         message: "Item not found in cart",
       });
     }
+
+    //remove the item
+    cart.items.splice(itemIndex, 1);
 
     await cart.save();
 
@@ -168,6 +182,7 @@ export const getCartSummary = async (_req, res) => {
   try {
     const cart = await Cart.findOne().populate("items.product");
 
+    //check for cart
     if (!cart || cart.items.length === 0) {
       return res.status(200).json({
         success: true,
@@ -183,6 +198,7 @@ export const getCartSummary = async (_req, res) => {
       0,
     );
 
+    //add tax
     const tax = Number((subtotal * TAX_RATE).toFixed(2));
     const total = Number((subtotal + tax).toFixed(2));
 

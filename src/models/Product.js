@@ -31,15 +31,9 @@ const productSchema = new mongoose.Schema(
         message: "Stock must be an integer",
       },
     },
-
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
   },
   {
     timestamps: true,
-    versionKey: false,
   },
 );
 
