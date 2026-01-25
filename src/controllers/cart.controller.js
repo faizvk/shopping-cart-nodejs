@@ -7,13 +7,19 @@ export const addToCart = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
 
-    if (!productId || quantity == null || quantity <= 0) {
-      return res.status(400).json({ message: "Invalid input" });
+    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid productId and quantity are required",
+      });
     }
 
     const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    if (!product || !product.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
     }
 
     let cart = await Cart.findOne();
@@ -21,24 +27,36 @@ export const addToCart = async (req, res) => {
       cart = await Cart.create({ items: [] });
     }
 
-    const item = cart.items.find((i) => i.product.toString() === productId);
+    const existingItem = cart.items.find(
+      (item) => item.product.toString() === productId,
+    );
 
-    const currentQty = item ? item.quantity : 0;
+    const updatedQuantity = (existingItem?.quantity || 0) + quantity;
 
-    if (currentQty + quantity > product.stock) {
-      return res.status(400).json({ message: "Exceeds available stock" });
+    if (updatedQuantity > product.stock) {
+      return res.status(400).json({
+        success: false,
+        message: "Requested quantity exceeds available stock",
+      });
     }
 
-    if (item) {
-      item.quantity += quantity;
+    if (existingItem) {
+      existingItem.quantity = updatedQuantity;
     } else {
       cart.items.push({ product: productId, quantity });
     }
 
     await cart.save();
-    res.status(200).json(cart);
+
+    return res.status(200).json({
+      success: true,
+      data: cart,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add item to cart",
+    });
   }
 };
 
@@ -47,44 +65,112 @@ export const updateCartItem = async (req, res) => {
     const { productId, quantity } = req.body;
 
     if (!productId || quantity == null || quantity < 0) {
-      return res.status(400).json({ message: "Invalid input" });
-    }
-
-    const product = await Product.findById(productId);
-    if (!product || quantity > product.stock) {
-      return res.status(400).json({ message: "Invalid quantity" });
+      return res.status(400).json({
+        success: false,
+        message: "Valid productId and quantity are required",
+      });
     }
 
     const cart = await Cart.findOne();
     if (!cart) {
-      return res.status(404).json({ message: "Cart not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found",
+      });
     }
 
-    const item = cart.items.find((i) => i.product.toString() === productId);
+    const itemIndex = cart.items.findIndex(
+      (item) => item.product.toString() === productId,
+    );
 
-    if (!item) {
-      return res.status(404).json({ message: "Item not in cart" });
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found in cart",
+      });
     }
 
     if (quantity === 0) {
-      cart.items = cart.items.filter((i) => i.product.toString() !== productId);
+      cart.items.splice(itemIndex, 1);
     } else {
-      item.quantity = quantity;
+      const product = await Product.findById(productId);
+      if (!product || quantity > product.stock) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid quantity for product",
+        });
+      }
+
+      cart.items[itemIndex].quantity = quantity;
     }
 
     await cart.save();
-    res.status(200).json(cart);
+
+    return res.status(200).json({
+      success: true,
+      data: cart,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update cart item",
+    });
   }
 };
 
-export const getCartSummary = async (req, res) => {
+export const removeFromCart = async (req, res) => {
+  try {
+    const { productId } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        message: "ProductId is required",
+      });
+    }
+
+    const cart = await Cart.findOne();
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Cart not found",
+      });
+    }
+
+    const initialLength = cart.items.length;
+
+    cart.items = cart.items.filter(
+      (item) => item.product.toString() !== productId,
+    );
+
+    if (cart.items.length === initialLength) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found in cart",
+      });
+    }
+
+    await cart.save();
+
+    return res.status(200).json({
+      success: true,
+      data: cart,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove item from cart",
+    });
+  }
+};
+
+export const getCartSummary = async (_req, res) => {
   try {
     const cart = await Cart.findOne().populate("items.product");
 
-    if (!cart) {
+    if (!cart || cart.items.length === 0) {
       return res.status(200).json({
+        success: true,
         items: [],
         subtotal: 0,
         tax: 0,
@@ -97,16 +183,20 @@ export const getCartSummary = async (req, res) => {
       0,
     );
 
-    const tax = subtotal * TAX_RATE;
-    const total = subtotal + tax;
+    const tax = Number((subtotal * TAX_RATE).toFixed(2));
+    const total = Number((subtotal + tax).toFixed(2));
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       items: cart.items,
       subtotal,
       tax,
       total,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cart summary",
+    });
   }
 };

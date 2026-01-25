@@ -16,6 +16,10 @@ const productSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+      validate: {
+        validator: Number.isFinite,
+        message: "Price must be a valid number",
+      },
     },
 
     stock: {
