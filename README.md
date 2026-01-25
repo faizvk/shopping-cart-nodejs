@@ -10,6 +10,7 @@ A RESTful shopping cart backend built using **Node.js, Express, and MongoDB**, i
 - Express.js
 - MongoDB
 - Mongoose
+- Nodemon (development dependency)
 - ES Modules (`type: module`)
 - dotenv (environment configuration)
 
